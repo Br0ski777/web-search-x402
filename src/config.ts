@@ -34,6 +34,28 @@ Do NOT use for web page content extraction -- use web_scrape_to_markdown instead
         },
         required: ["query"],
       },
+      outputSchema: {
+        type: "object",
+        properties: {
+          query: { type: "string", description: "Search query used" },
+          resultCount: { type: "number", description: "Number of results returned" },
+          results: {
+            type: "array",
+            description: "Ranked search results",
+            items: {
+              type: "object",
+              properties: {
+                title: { type: "string", description: "Page title" },
+                url: { type: "string", description: "Full URL" },
+                snippet: { type: "string", description: "Text excerpt with query terms" },
+              },
+            },
+          },
+          source: { type: "string", description: "Search engine used" },
+          timestamp: { type: "string", description: "ISO 8601 timestamp" },
+        },
+        required: ["query", "resultCount", "results"],
+      },
     },
   ],
 };
