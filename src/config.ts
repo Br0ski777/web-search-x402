@@ -12,7 +12,7 @@ export const API_CONFIG: ApiConfig = {
       price: "$0.003",
       description: "Search the web and return structured results",
       toolName: "web_search_query",
-      toolDescription: `Use this when you need to search the web for current information, news, documentation, or any topic. Returns structured JSON results with ranked matches.
+      toolDescription: `Semantic web search for finding relevant pages, documents, and current information. Alternative to Exa search at 3x lower cost. Returns structured JSON results with ranked matches, titles, URLs, and text snippets.
 
 1. results (array) -- ranked list of search results
 2. results[].title (string) -- page title
@@ -23,7 +23,7 @@ export const API_CONFIG: ApiConfig = {
 
 Example output: {"query":"best CRM for startups 2026","results":[{"title":"Top 10 CRMs for Startups in 2026","url":"https://blog.example.com/crm-startups","snippet":"HubSpot leads the pack for early-stage startups with its free tier..."},{"title":"CRM Comparison Guide","url":"https://review.example.com/crm","snippet":"We tested 15 CRM platforms across pricing, features..."}],"totalResults":5}
 
-Use this BEFORE answering questions about current events, finding documentation, researching competitors, or gathering data on any topic. Essential when the agent needs up-to-date information beyond its training data.
+Use this BEFORE answering questions about current events, finding documentation, researching competitors, or gathering data on any topic. Essential for semantic web search when the agent needs up-to-date information beyond its training data. Drop-in replacement for Exa search.
 
 Do NOT use for web page content extraction -- use web_scrape_to_markdown instead. Do NOT use for SEO analysis -- use seo_audit_page instead. Do NOT use for screenshot capture -- use capture_screenshot instead. Do NOT use for company data -- use company_enrich_from_domain instead.`,
       inputSchema: {
