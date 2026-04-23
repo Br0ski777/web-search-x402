@@ -63,7 +63,9 @@ async function setupPayments() {
     const coinbaseFacilitator = new HTTPFacilitatorClient(cdpConfig);
     const payaiFacilitator = new HTTPFacilitatorClient({ url: "https://facilitator.payai.network" });
 
-    const resourceServer = new x402ResourceServer(coinbaseFacilitator, payaiFacilitator)
+    // PayAI primary (indexes its Bazaar on settle — x402scan visibility).
+    // Coinbase CDP fallback (covers 83% of buyers if PayAI is down).
+    const resourceServer = new x402ResourceServer(payaiFacilitator, coinbaseFacilitator)
       .register("eip155:8453", new ExactEvmScheme());
 
     const x402Middleware = paymentMiddleware(
