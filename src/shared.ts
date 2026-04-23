@@ -86,53 +86,56 @@ export function x402scanEnrichMiddleware(routes: RouteConfig[]) {
   };
 }
 
+// Generate a minimal example payload from a JSON Schema (empty object fallback).
+function exampleFromSchema(schema: Record<string, unknown> | undefined): Record<string, unknown> {
+  if (!schema || typeof schema !== "object") return {};
+  const props = (schema as any).properties || {};
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(props)) {
+    const p: any = v;
+    if (p.example !== undefined) out[k] = p.example;
+    else if (p.default !== undefined) out[k] = p.default;
+    else if (p.type === "string") out[k] = "example";
+    else if (p.type === "number" || p.type === "integer") out[k] = 1;
+    else if (p.type === "boolean") out[k] = true;
+    else if (p.type === "array") out[k] = [];
+    else if (p.type === "object") out[k] = {};
+  }
+  return out;
+}
+
 export function buildPaymentConfig(routes: RouteConfig[], payTo = WALLET_ADDRESS, network = DEFAULT_NETWORK) {
+  // Lazy require to avoid breaking non-server contexts
+  const { declareDiscoveryExtension } = require("@x402/extensions/bazaar") as {
+    declareDiscoveryExtension: (cfg: Record<string, unknown>) => Record<string, unknown>;
+  };
+
   const config: Record<string, unknown> = {};
   for (const route of routes) {
+    // Build proper bazaar extension via official helper — passes CDP strict JSON Schema validation.
+    const exampleInput = exampleFromSchema(route.inputSchema);
+    const exampleOutput = route.outputSchema ? exampleFromSchema(route.outputSchema as any) : undefined;
+
+    const bazaarExt = (route.method === "POST" || route.method === "PUT")
+      ? declareDiscoveryExtension({
+          method: route.method,
+          input: exampleInput,
+          inputSchema: route.inputSchema,
+          bodyType: "json",
+          ...(exampleOutput ? { output: { example: exampleOutput } } : {}),
+        })
+      : declareDiscoveryExtension({
+          method: route.method,
+          input: exampleInput,
+          inputSchema: route.inputSchema,
+          ...(exampleOutput ? { output: { example: exampleOutput } } : {}),
+        });
+
     config[`${route.method} ${route.path}`] = {
       accepts: [{ scheme: "exact", price: route.price, network, payTo }],
       description: route.description,
       mimeType: route.mimeType ?? "application/json",
-      extensions: {
-        bazaar: {
-          info: {
-            input: {
-              type: "http",
-              method: route.method,
-              bodyType: "json",
-              body: route.inputSchema,
-            },
-            output: {
-              type: "json",
-              schema: route.outputSchema || { type: "object", description: route.description },
-              example: route.outputSchema ? {} : { success: true },
-            },
-          },
-          schema: {
-            "$schema": "https://json-schema.org/draft/2020-12/schema",
-            type: "object",
-            properties: {
-              input: {
-                type: "object",
-                properties: {
-                  type: { type: "string", const: "http" },
-                  bodyType: { type: "string", enum: ["json"] },
-                  body: route.inputSchema,
-                },
-                required: ["body"],
-              },
-              output: {
-                type: "object",
-                properties: {
-                  type: { type: "string" },
-                  example: { type: "object" },
-                },
-              },
-            },
-            required: ["input", "output"],
-          },
-        },
-      },
+      extensions: bazaarExt,
     };
   }
   // Mirror POST routes as GET for indexer probes (402index.io)
