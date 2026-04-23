@@ -54,6 +54,7 @@ async function setupPayments() {
     const { ExactEvmScheme } = await import("@x402/evm/exact/server");
     const { HTTPFacilitatorClient } = await import("@x402/core/server");
     const { createFacilitatorConfig } = await import("@coinbase/x402");
+    const { bazaarResourceServerExtension } = await import("@x402/extensions/bazaar");
 
     // Coinbase CDP facilitator (83% of x402 market) with PayAI fallback
     const cdpConfig = createFacilitatorConfig(
@@ -63,10 +64,11 @@ async function setupPayments() {
     const coinbaseFacilitator = new HTTPFacilitatorClient(cdpConfig);
     const payaiFacilitator = new HTTPFacilitatorClient({ url: "https://facilitator.payai.network" });
 
-    // PayAI primary (indexes its Bazaar on settle — x402scan visibility).
-    // Coinbase CDP fallback (covers 83% of buyers if PayAI is down).
-    const resourceServer = new x402ResourceServer(payaiFacilitator, coinbaseFacilitator)
-      .register("eip155:8453", new ExactEvmScheme());
+    // registerExtension(bazaarResourceServerExtension) enables CDP Bazaar indexing.
+    // Without it, CDP settles payments but doesn't catalog the resource.
+    const resourceServer = new x402ResourceServer(coinbaseFacilitator, payaiFacilitator)
+      .register("eip155:8453", new ExactEvmScheme())
+      .registerExtension(bazaarResourceServerExtension);
 
     const x402Middleware = paymentMiddleware(
       buildPaymentConfig(API_CONFIG.routes, undefined, "eip155:8453"),
