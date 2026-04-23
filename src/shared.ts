@@ -307,9 +307,9 @@ export function setupMcp(app: any, config: ApiConfig) {
     });
   });
 
-  // Message endpoint — handles JSON-RPC, responds directly as HTTP JSON
-  // Also accepts requests without sessionId for stateless MCP clients
-  app.post("/message", async (c: any) => {
+  // Streamable HTTP & SSE message handler — handles JSON-RPC, responds directly as HTTP JSON.
+  // Single function attached to both /message (legacy SSE transport) and /mcp (Streamable HTTP).
+  const handleMcpRequest = async (c: any) => {
     const sessionId = c.req.query("sessionId");
     const session = sessionId ? sessions.get(sessionId) : null;
     const req = await c.req.json();
@@ -347,15 +347,26 @@ export function setupMcp(app: any, config: ApiConfig) {
         const route = tool._route;
         const port = process.env.PORT || "3000";
         const args = req.params?.arguments || {};
+
+        // Proxy bypass: if request carries a valid XPAY_PROXY_KEY Bearer token,
+        // call the internal endpoint with the same token so the x402 paywall
+        // middleware lets it through (proxy has already billed the agent).
+        const authHeader = c.req.header("authorization") || "";
+        const xpayKey = process.env.XPAY_PROXY_KEY;
+        const isProxyAuthed = xpayKey && authHeader === `Bearer ${xpayKey}`;
+
         try {
+          const headers: Record<string, string> = { "Content-Type": "application/json" };
+          if (isProxyAuthed) headers["Authorization"] = authHeader;
+
           let resp: Response;
           if (route.method === "GET") {
             const qs = new URLSearchParams(args as Record<string, string>).toString();
-            resp = await fetch(`http://localhost:${port}${route.path}${qs ? "?" + qs : ""}`);
+            resp = await fetch(`http://localhost:${port}${route.path}${qs ? "?" + qs : ""}`, { headers });
           } else {
             resp = await fetch(`http://localhost:${port}${route.path}`, {
               method: "POST",
-              headers: { "Content-Type": "application/json" },
+              headers,
               body: JSON.stringify(args),
             });
           }
@@ -388,9 +399,15 @@ export function setupMcp(app: any, config: ApiConfig) {
       } catch {}
     }
 
-    // ALSO return as direct HTTP response (Smithery uses this)
+    // ALSO return as direct HTTP response (Smithery / Streamable HTTP clients use this)
     return c.json(response);
-  });
+  };
 
-  console.log(`[mcp] SSE transport ready — ${tools.length} tools`);
+  // Attach handler on both transports:
+  // - /message : legacy SSE (paired with /sse)
+  // - /mcp     : Streamable HTTP (modern MCP clients, xpay proxy)
+  app.post("/message", handleMcpRequest);
+  app.post("/mcp", handleMcpRequest);
+
+  console.log(`[mcp] SSE + Streamable HTTP ready — ${tools.length} tools`);
 }

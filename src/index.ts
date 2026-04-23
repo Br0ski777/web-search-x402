@@ -65,10 +65,20 @@ async function setupPayments() {
 
     const resourceServer = new x402ResourceServer(coinbaseFacilitator, payaiFacilitator)
       .register("eip155:8453", new ExactEvmScheme());
-    app.use("/api/*", paymentMiddleware(
+
+    const x402Middleware = paymentMiddleware(
       buildPaymentConfig(API_CONFIG.routes, undefined, "eip155:8453"),
       resourceServer
-    ));
+    );
+
+    // Conditional wrapping: bypass paywall if request is from xpay proxy (valid Bearer XPAY_PROXY_KEY).
+    app.use("/api/*", async (c, next) => {
+      const key = process.env.XPAY_PROXY_KEY;
+      if (key && c.req.header("authorization") === `Bearer ${key}`) {
+        return next();
+      }
+      return x402Middleware(c, next);
+    });
     console.log("[x402] BASE MAINNET (Coinbase CDP + PayAI) — " + API_CONFIG.routes.length + " routes");
   } catch (e: any) {
     console.warn("[x402] FREE mode:", e.message);
@@ -92,11 +102,19 @@ async function setupAtxp() {
       const priceNum = parseFloat((r.price || "0").replace("$", ""));
       priceMap.set(`${r.method} ${r.path}`, priceNum);
     }
-    app.use("*", atxpHono({
+    const atxpMiddleware = atxpHono({
       destination: new ATXPAccount(conn),
       payeeName: API_CONFIG.name,
       priceForRequest: (method, path) => priceMap.get(`${method} ${path}`) ?? null,
-    }));
+    });
+    // Conditional wrapping: bypass ATXP if request is from xpay proxy (valid Bearer XPAY_PROXY_KEY).
+    app.use("*", async (c, next) => {
+      const key = process.env.XPAY_PROXY_KEY;
+      if (key && c.req.header("authorization") === `Bearer ${key}`) {
+        return next();
+      }
+      return atxpMiddleware(c, next);
+    });
     console.log(`[atxp] Enabled — ${priceMap.size} gated routes, omni-challenge active`);
   } catch (e: any) {
     console.warn("[atxp] Failed to init:", e.message);
