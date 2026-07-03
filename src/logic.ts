@@ -22,19 +22,26 @@ interface SearchResult {
 }
 
 async function searchDuckDuckGo(query: string, count: number): Promise<SearchResult[]> {
-  // Use DuckDuckGo HTML search and parse results
-  const encoded = encodeURIComponent(query);
-  const response = await fetch(`https://html.duckduckgo.com/html/?q=${encoded}`, {
+  // Use DuckDuckGo HTML search and parse results.
+  // NOTE: the /html/ endpoint's <form> is method="post" — a GET request returns an
+  // empty results shell (no results, no error). Must POST the query.
+  const response = await fetch("https://html.duckduckgo.com/html/", {
+    method: "POST",
     headers: {
       "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+      "Content-Type": "application/x-www-form-urlencoded",
     },
+    body: `q=${encodeURIComponent(query)}`,
   });
 
   const html = await response.text();
   const results: SearchResult[] = [];
 
-  // Parse DuckDuckGo HTML results
-  const resultBlocks = html.split('class="result__body"');
+  // Parse DuckDuckGo HTML results. The result container is
+  // `<div class="result results_links ...">` wrapping a
+  // `<div class="links_main links_deep result__body">` — split on the outer
+  // container since the exact class string "result__body" never appears verbatim.
+  const resultBlocks = html.split(/<div class="result results_links/);
   for (let i = 1; i < resultBlocks.length && results.length < count; i++) {
     const block = resultBlocks[i];
 
@@ -57,8 +64,10 @@ async function searchDuckDuckGo(query: string, count: number): Promise<SearchRes
       if (urlTextMatch) url = "https://" + urlTextMatch[1].trim();
     }
 
-    // Extract snippet
-    const snippetMatch = block.match(/class="result__snippet"[^>]*>([^<]+(?:<[^>]+>[^<]*)*)/);
+    // Extract snippet. Query terms are wrapped in <b> and can appear as the very
+    // first character (e.g. "<b>Bitcoin</b> is..."), so the captured span must allow
+    // starting on a tag, not just on plain text.
+    const snippetMatch = block.match(/class="result__snippet"[^>]*>([\s\S]*?)<\/a>/);
     let snippet = snippetMatch ? snippetMatch[1].trim() : "";
     snippet = snippet.replace(/<[^>]+>/g, "").trim();
     snippet = decodeHTMLEntities(snippet);
