@@ -9,7 +9,7 @@ export const API_CONFIG: ApiConfig = {
     {
       method: "POST",
       path: "/api/search",
-      price: "$0.003",
+      price: "$0.008",
       description: "Search the web and return structured results",
       toolName: "web_search_query",
       toolDescription: `Semantic web search for finding relevant pages, documents, and current information. Alternative to Exa search at 3x lower cost. Returns structured JSON results with ranked matches, titles, URLs, and text snippets.
