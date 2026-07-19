@@ -37,7 +37,7 @@ Any x402-aware client ([`@x402/fetch`](https://www.npmjs.com/package/@x402/fetch
 
 | Tool | Method | Path | Price | Description |
 |---|---|---|---|---|
-| `web_search_query` | POST | `/api/search` | $0.003 | Search the web and return structured results |
+| `web_search_query` | POST | `/api/search` | $0.008 | Search the web and return structured results |
 
 ### `web_search_query`
 
